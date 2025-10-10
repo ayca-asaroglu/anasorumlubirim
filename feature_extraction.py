@@ -8,6 +8,7 @@ including SBERT embeddings, TF-IDF vectors, and categorical feature encoding.
 import os
 import numpy as np
 import pandas as pd
+from typing import List, Optional, Any
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder

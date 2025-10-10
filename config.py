@@ -15,7 +15,7 @@ DATA_CONFIG = {
 
 # Text Preprocessing Configuration
 PREPROCESSING_CONFIG = {
-    "min_samples_per_class": 30,
+    "min_samples_per_class": 5,
     "tfidf_max_features": 100,
     "sbert_model": "paraphrase-multilingual-mpnet-base-v2",
     "embedding_cache_file": "sbert_embeddings_pipe11_min30_0910_1.npy"

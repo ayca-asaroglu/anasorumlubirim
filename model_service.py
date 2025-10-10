@@ -171,6 +171,10 @@ class ModelService:
                 ]
             )
             
+            # Ensure X_base is 2D
+            if X_base.ndim == 1:
+                X_base = X_base.reshape(1, -1)
+            
             # Make predictions
             predictions = await self._make_hierarchical_prediction(X_base)
             
