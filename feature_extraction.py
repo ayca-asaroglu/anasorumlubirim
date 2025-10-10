@@ -43,6 +43,15 @@ class FeatureExtractor:
         """
         cache_file = cache_file or self.config["embedding_cache_file"]
         
+        # For API predictions (single text), always compute new embeddings
+        if len(texts) == 1:
+            print("📦 Computing SBERT embeddings for single text...")
+            if self.sbert_model is None:
+                self.sbert_model = SentenceTransformer(self.config["sbert_model"])
+            embeddings = self.sbert_model.encode(texts, show_progress_bar=False)
+            return embeddings
+        
+        # For training (multiple texts), use cache if available
         if os.path.exists(cache_file):
             print("✅ SBERT embeddings loading from cache...")
             return np.load(cache_file)
