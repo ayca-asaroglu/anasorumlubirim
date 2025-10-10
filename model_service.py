@@ -103,6 +103,7 @@ class ModelService:
             # Load feature extractor components
             self.feature_extractor.tfidf_vectorizer = joblib.load('models/tfidf_vectorizer.pkl')
             self.feature_extractor.sbert_model = joblib.load('models/sbert_model.pkl')
+            self.categorical_columns = joblib.load('models/categorical_columns.pkl')
             
             logger.info("✅ Trained models loaded from saved files")
             

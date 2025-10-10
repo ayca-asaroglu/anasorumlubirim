@@ -76,6 +76,13 @@ def train_and_save_models():
     # Create upper-level one-hot features
     upper_onehot = pd.get_dummies(df_filtered["anaSorumluBirimUstBirim"], prefix="ust")
     
+    # Create categorical features to save column structure
+    categorical_columns = [
+        "EtkilenecekKanallar", "talep_tipi", "talep_alt_tipi", 
+        "reporterBirim", "reporterDirektorluk"
+    ]
+    cat_features = feature_extractor.get_categorical_features(df_filtered, categorical_columns)
+    
     print(f"✅ Features extracted: {X_base.shape}")
     
     # Prepare labels
@@ -111,6 +118,7 @@ def train_and_save_models():
     # Save feature extractor components
     joblib.dump(feature_extractor.tfidf_vectorizer, "models/tfidf_vectorizer.pkl")
     joblib.dump(feature_extractor.sbert_model, "models/sbert_model.pkl")
+    joblib.dump(cat_features.columns.tolist(), "models/categorical_columns.pkl")
     
     # Save classifier components
     joblib.dump(classifier.upper_model, "models/upper_model.pkl")

@@ -89,13 +89,15 @@ class FeatureExtractor:
         return tfidf_df
     
     def get_categorical_features(self, df: pd.DataFrame, 
-                               categorical_columns: List[str]) -> pd.DataFrame:
+                               categorical_columns: List[str], 
+                               expected_columns: List[str] = None) -> pd.DataFrame:
         """
         Generate one-hot encoded features for categorical columns.
         
         Args:
             df: Input DataFrame
             categorical_columns: List of categorical column names
+            expected_columns: List of expected column names (for API predictions)
             
         Returns:
             Combined one-hot encoded features as DataFrame
@@ -112,9 +114,24 @@ class FeatureExtractor:
                 feature_dfs.append(dummies)
         
         if feature_dfs:
-            return pd.concat(feature_dfs, axis=1)
+            combined_df = pd.concat(feature_dfs, axis=1)
+            
+            # For API predictions, ensure we have the same columns as training
+            if expected_columns is not None:
+                # Add missing columns with zeros
+                for col in expected_columns:
+                    if col not in combined_df.columns:
+                        combined_df[col] = 0
+                
+                # Remove extra columns
+                combined_df = combined_df[expected_columns]
+            
+            return combined_df
         else:
-            return pd.DataFrame()
+            if expected_columns is not None:
+                return pd.DataFrame(0, index=df.index, columns=expected_columns)
+            else:
+                return pd.DataFrame()
     
     def encode_labels(self, labels: pd.Series, label_name: str) -> np.ndarray:
         """
@@ -210,7 +227,9 @@ class FeatureExtractor:
         
         # Categorical features
         if categorical_columns:
-            cat_features = self.get_categorical_features(df, categorical_columns)
+            # Use expected columns if available (for API predictions)
+            expected_cols = getattr(self, 'categorical_columns', None)
+            cat_features = self.get_categorical_features(df, categorical_columns, expected_cols)
             if not cat_features.empty:
                 features.append(cat_features.values)
                 feature_names.append("categorical")
