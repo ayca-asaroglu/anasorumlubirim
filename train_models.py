@@ -70,7 +70,8 @@ def train_and_save_models():
     X_base, _, _ = feature_extractor.extract_all_features(
         df_filtered,
         text_columns=["SUMMARY", "description"],
-        categorical_columns=categorical_columns
+        categorical_columns=categorical_columns,
+        fit_vectorizer=True
     )
     
     # Create upper-level one-hot features

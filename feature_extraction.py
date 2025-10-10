@@ -66,21 +66,29 @@ class FeatureExtractor:
         
         return embeddings
     
-    def get_tfidf_features(self, texts: List[str]) -> pd.DataFrame:
+    def get_tfidf_features(self, texts: List[str], fit_vectorizer: bool = False) -> pd.DataFrame:
         """
         Generate TF-IDF features for texts.
         
         Args:
             texts: List of texts to process
+            fit_vectorizer: Whether to fit the vectorizer (for training)
             
         Returns:
             TF-IDF features as DataFrame
         """
         if self.tfidf_vectorizer is None:
-            raise ValueError("TF-IDF vectorizer not loaded. Please load trained models first.")
+            self.tfidf_vectorizer = TfidfVectorizer(
+                max_features=self.config["tfidf_max_features"]
+            )
         
-        # Transform texts using the pre-trained vectorizer
-        tfidf_matrix = self.tfidf_vectorizer.transform(texts)
+        if fit_vectorizer:
+            # Fit and transform (for training)
+            tfidf_matrix = self.tfidf_vectorizer.fit_transform(texts)
+        else:
+            # Transform only (for API predictions)
+            tfidf_matrix = self.tfidf_vectorizer.transform(texts)
+        
         tfidf_df = pd.DataFrame(
             tfidf_matrix.toarray(),
             columns=self.tfidf_vectorizer.get_feature_names_out()
@@ -183,7 +191,8 @@ class FeatureExtractor:
     def extract_all_features(self, df: pd.DataFrame, 
                            text_columns: List[str],
                            categorical_columns: List[str],
-                           target_column: str = None) -> tuple:
+                           target_column: str = None,
+                           fit_vectorizer: bool = False) -> tuple:
         """
         Extract all features from the DataFrame.
         
@@ -221,7 +230,7 @@ class FeatureExtractor:
         
         # TF-IDF features
         if combined_text:
-            tfidf_df = self.get_tfidf_features(combined_text)
+            tfidf_df = self.get_tfidf_features(combined_text, fit_vectorizer=fit_vectorizer)
             features.append(tfidf_df.values)
             feature_names.append("tfidf")
         
