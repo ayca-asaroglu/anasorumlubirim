@@ -171,9 +171,15 @@ class ModelService:
                 ]
             )
             
-            # Ensure X_base is 2D
+            # Ensure X_base is 2D and has correct shape
             if X_base.ndim == 1:
                 X_base = X_base.reshape(1, -1)
+            elif X_base.shape[0] == 0:
+                # Handle empty array case
+                X_base = np.zeros((1, 100))  # Default feature size
+            elif X_base.shape[0] > 1:
+                # Take only the first row if multiple rows exist
+                X_base = X_base[:1, :]
             
             # Make predictions
             predictions = await self._make_hierarchical_prediction(X_base)
