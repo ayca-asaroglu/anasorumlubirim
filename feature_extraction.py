@@ -77,11 +77,10 @@ class FeatureExtractor:
             TF-IDF features as DataFrame
         """
         if self.tfidf_vectorizer is None:
-            self.tfidf_vectorizer = TfidfVectorizer(
-                max_features=self.config["tfidf_max_features"]
-            )
+            raise ValueError("TF-IDF vectorizer not loaded. Please load trained models first.")
         
-        tfidf_matrix = self.tfidf_vectorizer.fit_transform(texts)
+        # Transform texts using the pre-trained vectorizer
+        tfidf_matrix = self.tfidf_vectorizer.transform(texts)
         tfidf_df = pd.DataFrame(
             tfidf_matrix.toarray(),
             columns=self.tfidf_vectorizer.get_feature_names_out()
