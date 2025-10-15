@@ -43,6 +43,10 @@ class PredictionResponse(BaseModel):
         default=None,
         description="Top-k application/unit candidates from RAG retriever"
     )
+    app_candidates: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Top-k application candidates from FAISS-backed app retriever"
+    )
 
 
 class BatchPredictionRequest(BaseModel):
