@@ -82,7 +82,10 @@ AZURE_OPENAI_CONFIG = {
     "endpoint_env": "AZURE_OPENAI_ENDPOINT",          # e.g., https://YOUR-RESOURCE.openai.azure.com/
     "api_key_env": "AZURE_OPENAI_API_KEY",           # key value in env
     "api_version": "2024-07-01-preview",             # API version
-    "embedding_deployment": "text-embedding-3-large" # Your embedding deployment name
+    "embedding_deployment": "text-embedding-3-large", # Your embedding deployment name
+    # Optional direct values (used if env vars are not set)
+    "endpoint": "",
+    "api_key": ""
 }
 
 # Turkish Stopwords

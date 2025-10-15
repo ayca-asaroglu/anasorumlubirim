@@ -95,8 +95,8 @@ class AppFaissRetriever:
         except Exception as exc:
             raise RuntimeError(f"openai package not installed or incompatible: {exc}")
 
-        endpoint = os.getenv(AZURE_OPENAI_CONFIG["endpoint_env"]) or ""
-        api_key = os.getenv(AZURE_OPENAI_CONFIG["api_key_env"]) or ""
+        endpoint = os.getenv(AZURE_OPENAI_CONFIG["endpoint_env"]) or AZURE_OPENAI_CONFIG.get("endpoint", "")
+        api_key = os.getenv(AZURE_OPENAI_CONFIG["api_key_env"]) or AZURE_OPENAI_CONFIG.get("api_key", "")
         api_version = AZURE_OPENAI_CONFIG["api_version"]
         deployment = AZURE_OPENAI_CONFIG["embedding_deployment"]
         if not endpoint or not api_key:
