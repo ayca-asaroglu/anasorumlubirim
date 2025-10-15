@@ -61,6 +61,30 @@ RAG_CONFIG = {
     "top_k": 5                        # Top-k candidates to retrieve
 }
 
+# Separate FAISS-backed RAG for Application Catalog
+RAG_APP_CONFIG = {
+    "enabled": False,                  # Off by default
+    "excel_path": "app_catalog.xlsx", # Separate Excel for app catalog
+    "sheet_name": 0,
+    "app_name_col": "UygulamaAdi",
+    "app_desc_col": "UygulamaAciklamasi",
+    "directorate_col": "Direktorluk",
+    "units_col": "Birimler",
+    "top_k": 5,
+    "faiss_index_path": "faiss_app.index",  # Persisted FAISS index path
+    # Provider can be: "sbert" (default) or "azure_openai"
+    "provider": "sbert"
+}
+
+# Azure OpenAI Embedding Configuration (used when RAG_APP_CONFIG.provider == "azure_openai")
+AZURE_OPENAI_CONFIG = {
+    # Set these via environment variables in production; keep here for structure
+    "endpoint_env": "AZURE_OPENAI_ENDPOINT",          # e.g., https://YOUR-RESOURCE.openai.azure.com/
+    "api_key_env": "AZURE_OPENAI_API_KEY",           # key value in env
+    "api_version": "2024-07-01-preview",             # API version
+    "embedding_deployment": "text-embedding-3-large" # Your embedding deployment name
+}
+
 # Turkish Stopwords
 TURKISH_STOPWORDS = [
     # Basic Turkish stopwords
