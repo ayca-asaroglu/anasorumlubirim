@@ -1,11 +1,14 @@
 from typing import List, Dict, Any
 import os
+import logging
 import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 import faiss
 import os
 from config import RAG_APP_CONFIG, PREPROCESSING_CONFIG, AZURE_OPENAI_CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 class AppFaissRetriever:
@@ -20,10 +23,13 @@ class AppFaissRetriever:
 
     def load(self):
         if not self.config.get("enabled", False):
+            logger.info("AppFaissRetriever disabled via config; skipping load().")
             return self
 
+        logger.info("[AppFaissRetriever] Starting load()")
         excel_path = self.config["excel_path"]
         sheet_name = self.config.get("sheet_name", 0)
+        logger.info(f"[AppFaissRetriever] Reading Excel from: {excel_path} (sheet={sheet_name})")
         self.df = pd.read_excel(excel_path, sheet_name=sheet_name)
 
         name_col = self.config["app_name_col"]
@@ -32,25 +38,34 @@ class AppFaissRetriever:
             self.df[name_col].fillna("").astype(str).str.strip() + " \n " +
             self.df[desc_col].fillna("").astype(str).str.strip()
         ).tolist()
+        logger.info(f"[AppFaissRetriever] Loaded {len(texts)} rows for embedding")
 
         provider = self.config.get("provider", "sbert")
+        logger.info(f"[AppFaissRetriever] Embedding provider: {provider}")
         if provider == "azure_openai":
+            logger.info("[AppFaissRetriever] Generating embeddings via Azure OpenAI ...")
             self.embeddings = self._embed_with_azure_openai(texts)
         else:
             # SBERT embeddings
             if self.model is None:
                 self.model = SentenceTransformer(PREPROCESSING_CONFIG["sbert_model"])
+            logger.info("[AppFaissRetriever] Generating embeddings via SBERT ...")
             self.embeddings = self.model.encode(texts, show_progress_bar=False, normalize_embeddings=True)
+        logger.info(f"[AppFaissRetriever] Embeddings shape: {None if self.embeddings is None else self.embeddings.shape}")
 
         # Build / load FAISS index (cosine via inner product on normalized vectors)
         dim = self.embeddings.shape[1]
         index_path = self.config.get("faiss_index_path", "faiss_app.index")
+        logger.info(f"[AppFaissRetriever] FAISS index path: {index_path}")
         if os.path.exists(index_path):
+            logger.info("[AppFaissRetriever] Reading existing FAISS index from disk ...")
             self.index = faiss.read_index(index_path)
         else:
+            logger.info("[AppFaissRetriever] Creating new FAISS index ...")
             self.index = faiss.IndexFlatIP(dim)
             self.index.add(self.embeddings.astype("float32"))
             faiss.write_index(self.index, index_path)
+            logger.info("[AppFaissRetriever] FAISS index written to disk.")
         return self
 
     def retrieve(self, query: str, top_k: int = None) -> List[Dict[str, Any]]:
@@ -60,14 +75,18 @@ class AppFaissRetriever:
             raise RuntimeError("FAISS retriever not loaded. Call load() first.")
         top_k = top_k or self.config.get("top_k", 5)
 
+        logger.info(f"[AppFaissRetriever] retrieve() query len={len(query)} top_k={top_k}")
         provider = self.config.get("provider", "sbert")
         if provider == "azure_openai":
+            logger.info("[AppFaissRetriever] Encoding query via Azure OpenAI ...")
             q = self._embed_with_azure_openai([query]).astype("float32")
         else:
+            logger.info("[AppFaissRetriever] Encoding query via SBERT ...")
             q = self.model.encode([query], show_progress_bar=False, normalize_embeddings=True).astype("float32")
         scores, idxs = self.index.search(q, top_k)
         scores = scores[0]
         idxs = idxs[0]
+        logger.info(f"[AppFaissRetriever] retrieve() indices={idxs.tolist()} scores={scores.tolist()}")
 
         name_col = self.config["app_name_col"]
         desc_col = self.config["app_desc_col"]
@@ -100,11 +119,13 @@ class AppFaissRetriever:
         api_version = AZURE_OPENAI_CONFIG["api_version"]
         deployment = AZURE_OPENAI_CONFIG["embedding_deployment"]
         if not endpoint or not api_key:
-            raise RuntimeError("Azure OpenAI endpoint/key not set in environment variables")
+            raise RuntimeError("Azure OpenAI endpoint/key not set (env or config)")
 
+        logger.info("[AppFaissRetriever] Calling Azure OpenAI embeddings API ...")
         client = AzureOpenAI(api_key=api_key, api_version=api_version, azure_endpoint=endpoint)
         # Batch to respect token limits if needed; simple single-call here
         resp = client.embeddings.create(input=texts, model=deployment)
+        logger.info("[AppFaissRetriever] Azure OpenAI embeddings response received.")
         vecs = [np.array(d.embedding, dtype=np.float32) for d in resp.data]
         # Normalize for cosine via inner product
         arr = np.vstack(vecs)
