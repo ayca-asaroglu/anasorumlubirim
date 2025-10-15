@@ -108,6 +108,51 @@ def train_and_save_models():
     )
     
     print("✅ Models trained successfully")
+
+    # ================= Hierarchical evaluation on a held-out test split =================
+    # Use the upper model's test split indices to define a consistent evaluation set
+    test_idx = upper_results["test_indices"]
+    df_test = df_filtered.iloc[test_idx]
+    X_test = X_base[test_idx]
+
+    # Ground-truth labels (strings) for the test set
+    y_upper_true_str = df_test["anaSorumluBirimUstBirim"].values
+    y_lower_true_str = df_test["AnaSorumluBirim_Duzenlenmis"].values
+
+    # End-to-end (upper prediction feeds lower) evaluation
+    hier_preds = classifier.predict_hierarchical(
+        X_test=X_test,
+        df_test=df_test,
+        upper_class_column="anaSorumluBirimUstBirim",
+        lower_class_column="AnaSorumluBirim_Duzenlenmis"
+    )
+    upper_pred_str = hier_preds["upper_predictions"]
+    lower_pred_str = hier_preds["lower_predictions"]
+
+    # Exact-match (both upper and lower must be correct)
+    exact_match = (upper_pred_str == y_upper_true_str) & (lower_pred_str == y_lower_true_str)
+    e2e_accuracy = float(np.mean(exact_match))
+    # Joint F1 over combined labels
+    from sklearn.metrics import f1_score, accuracy_score
+    joint_true = [f"{u}__{l}" for u, l in zip(y_upper_true_str, y_lower_true_str)]
+    joint_pred = [f"{u}__{l}" for u, l in zip(upper_pred_str, lower_pred_str)]
+    e2e_f1 = f1_score(joint_true, joint_pred, average="weighted")
+
+    # Lower-oracle (provide true upper as one-hot to lower model) on the same test split
+    upper_true_onehot = pd.get_dummies(pd.Series(y_upper_true_str), prefix="ust")
+    # Ensure all upper classes exist and order matches encoder
+    for class_name in classifier.upper_label_encoder.classes_:
+        col = f"ust_{class_name}"
+        if col not in upper_true_onehot.columns:
+            upper_true_onehot[col] = 0
+    upper_true_onehot = upper_true_onehot[[f"ust_{c}" for c in classifier.upper_label_encoder.classes_]]
+
+    X_lower_input_oracle = np.hstack([X_test, upper_true_onehot.values])
+    X_lower_sel_oracle = classifier.lower_selector.transform(X_lower_input_oracle)
+    lower_oracle_pred_enc = classifier.lower_model.predict(X_lower_sel_oracle)
+    lower_oracle_pred_str = classifier.lower_label_encoder.inverse_transform(lower_oracle_pred_enc)
+    lower_oracle_acc = accuracy_score(y_lower_true_str, lower_oracle_pred_str)
+    lower_oracle_f1 = f1_score(y_lower_true_str, lower_oracle_pred_str, average="weighted")
     
     # Save models and components
     print("💾 Saving models...")
@@ -135,19 +180,33 @@ def train_and_save_models():
         "lower_classes": le_lower.classes_.tolist(),
         "feature_count": X_base.shape[1],
         "training_samples": len(df_filtered),
-        "upper_accuracy": upper_results["train_accuracy"],
-        "lower_accuracy": lower_results["train_accuracy"],
-        "upper_f1": upper_results["train_f1"],
-        "lower_f1": lower_results["train_f1"]
+        # Split-aware metrics
+        "upper_train_accuracy": upper_results["train_accuracy"],
+        "upper_train_f1": upper_results["train_f1"],
+        "upper_test_accuracy": upper_results.get("test_accuracy"),
+        "upper_test_f1": upper_results.get("test_f1"),
+        "lower_train_accuracy": lower_results["train_accuracy"],
+        "lower_train_f1": lower_results["train_f1"],
+        "lower_test_accuracy": lower_results.get("test_accuracy"),
+        "lower_test_f1": lower_results.get("test_f1"),
+        # Hierarchical metrics on test split
+        "e2e_accuracy": e2e_accuracy,
+        "e2e_f1": e2e_f1,
+        "lower_oracle_accuracy": lower_oracle_acc,
+        "lower_oracle_f1": lower_oracle_f1
     }
     
     joblib.dump(metadata, "models/model_metadata.pkl")
     
     print("✅ Models saved successfully!")
-    print(f"📊 Upper-level accuracy: {upper_results['train_accuracy']:.4f}")
-    print(f"📊 Lower-level accuracy: {lower_results['train_accuracy']:.4f}")
-    print(f"📊 Upper-level F1: {upper_results['train_f1']:.4f}")
-    print(f"📊 Lower-level F1: {lower_results['train_f1']:.4f}")
+    print(f"📊 Upper (train) acc: {upper_results['train_accuracy']:.4f} | f1: {upper_results['train_f1']:.4f}")
+    if upper_results.get('test_accuracy') is not None:
+        print(f"📊 Upper (test)  acc: {upper_results['test_accuracy']:.4f} | f1: {upper_results['test_f1']:.4f}")
+    print(f"📊 Lower (train) acc: {lower_results['train_accuracy']:.4f} | f1: {lower_results['train_f1']:.4f}")
+    if lower_results.get('test_accuracy') is not None:
+        print(f"📊 Lower (test)  acc: {lower_results['test_accuracy']:.4f} | f1: {lower_results['test_f1']:.4f}")
+    print(f"📦 End-to-end exact-match acc: {e2e_accuracy:.4f} | joint F1: {e2e_f1:.4f}")
+    print(f"🎯 Lower-oracle acc: {lower_oracle_acc:.4f} | f1: {lower_oracle_f1:.4f}")
     
     return metadata
 

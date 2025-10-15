@@ -49,20 +49,23 @@ class HierarchicalClassifier:
         """
         self.upper_label_encoder = label_encoder
         
-        # Feature selection
-        self.upper_selector = SelectKBest(
-            score_func=f_classif, 
-            k=self.config["feature_selection_k"]
-        )
-        X_selected = self.upper_selector.fit_transform(X, y)
-        
-        # Train-test split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_selected, y, 
+        # Create stratified train/test split using indices to avoid leakage
+        num_samples = X.shape[0]
+        indices = np.arange(num_samples)
+        train_idx, test_idx, y_train, y_test = train_test_split(
+            indices, y,
             test_size=self.config["test_size"],
             stratify=y,
             random_state=self.config["random_state"]
         )
+
+        # Fit selector ONLY on training data to prevent leakage
+        self.upper_selector = SelectKBest(
+            score_func=f_classif,
+            k=self.config["feature_selection_k"]
+        )
+        X_train_selected = self.upper_selector.fit_transform(X[train_idx], y_train)
+        X_test_selected = self.upper_selector.transform(X[test_idx])
         
         # Train model
         self.upper_model = CalibratedClassifierCV(
@@ -72,20 +75,27 @@ class HierarchicalClassifier:
             ), 
             cv=3
         )
-        self.upper_model.fit(X_train, y_train)
+        self.upper_model.fit(X_train_selected, y_train)
         
         # Evaluate
-        y_train_pred = self.upper_model.predict(X_train)
+        y_train_pred = self.upper_model.predict(X_train_selected)
         train_acc = self._calculate_accuracy(y_train, y_train_pred)
         train_f1 = self._calculate_f1_score(y_train, y_train_pred)
+
+        # Test metrics
+        y_test_pred = self.upper_model.predict(X_test_selected)
+        test_acc = self._calculate_accuracy(y_test, y_test_pred)
+        test_f1 = self._calculate_f1_score(y_test, y_test_pred)
         
         return {
-            "X_train": X_train,
-            "X_test": X_test,
+            "train_indices": train_idx,
+            "test_indices": test_idx,
             "y_train": y_train,
             "y_test": y_test,
             "train_accuracy": train_acc,
-            "train_f1": train_f1
+            "train_f1": train_f1,
+            "test_accuracy": test_acc,
+            "test_f1": test_f1
         }
     
     def train_lower_level_model(self, X: np.ndarray, y: np.ndarray, 
@@ -104,55 +114,56 @@ class HierarchicalClassifier:
         """
         self.lower_label_encoder = label_encoder
         
-        # Combine features with upper-level features if provided
+        # Combine features with upper-level features if provided (aligned by rows)
         if upper_features is not None:
             X_combined = np.hstack([X, upper_features])
         else:
             X_combined = X
-        
-        # Feature selection
-        self.lower_selector = SelectKBest(
-            score_func=f_classif, 
-            k=self.config["feature_selection_k"]
-        )
-        X_selected = self.lower_selector.fit_transform(X_combined, y)
-        
-        # Train-test split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_selected, y, 
+
+        # Create stratified train/test split using indices to avoid leakage
+        num_samples = X_combined.shape[0]
+        indices = np.arange(num_samples)
+        train_idx, test_idx, y_train, y_test = train_test_split(
+            indices, y,
             test_size=self.config["test_size"],
             stratify=y,
             random_state=self.config["random_state"]
         )
+
+        # Feature selection ONLY on training data to prevent leakage
+        self.lower_selector = SelectKBest(
+            score_func=f_classif, 
+            k=self.config["feature_selection_k"]
+        )
+        X_train_selected = self.lower_selector.fit_transform(X_combined[train_idx], y_train)
+        X_test_selected = self.lower_selector.transform(X_combined[test_idx])
         
         # Train model
         self.lower_model = LogisticRegression(
             max_iter=self.config["logistic_max_iter"],
             class_weight="balanced"
         )
-        self.lower_model.fit(X_train, y_train)
+        self.lower_model.fit(X_train_selected, y_train)
         
         # Evaluate
-        y_train_pred = self.lower_model.predict(X_train)
+        y_train_pred = self.lower_model.predict(X_train_selected)
         train_acc = self._calculate_accuracy(y_train, y_train_pred)
         train_f1 = self._calculate_f1_score(y_train, y_train_pred)
-        
-        # Cross-validation
-        cv_scores = cross_val_score(
-            self.lower_model, X_selected, y, 
-            cv=self.config["cv_folds"], 
-            scoring="f1_weighted"
-        )
+
+        # Test metrics
+        y_test_pred = self.lower_model.predict(X_test_selected)
+        test_acc = self._calculate_accuracy(y_test, y_test_pred)
+        test_f1 = self._calculate_f1_score(y_test, y_test_pred)
         
         return {
-            "X_train": X_train,
-            "X_test": X_test,
+            "train_indices": train_idx,
+            "test_indices": test_idx,
             "y_train": y_train,
             "y_test": y_test,
             "train_accuracy": train_acc,
             "train_f1": train_f1,
-            "cv_scores": cv_scores,
-            "cv_mean": np.mean(cv_scores)
+            "test_accuracy": test_acc,
+            "test_f1": test_f1
         }
     
     def predict_hierarchical(self, X_test: np.ndarray, 
