@@ -16,7 +16,7 @@ from preprocessing import TextPreprocessor
 from feature_extraction import FeatureExtractor
 from models import HierarchicalClassifier
 from api_models import PredictionRequest, PredictionResponse
-from config import PREPROCESSING_CONFIG, MODEL_CONFIG, RAG_CONFIG
+from config import PREPROCESSING_CONFIG, MODEL_CONFIG, RAG_CONFIG, RAG_APP_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ class ModelService:
         self.is_loaded = False
         self.model_info = {}
         self.rag = None
+        self.app_rag = None
         
     async def load_models(self):
         """Load all required models and components."""
@@ -64,6 +65,15 @@ class ModelService:
                     logger.info("✅ RAG retriever initialized")
                 except Exception as e:
                     logger.warning(f"RAG initialization failed: {e}")
+
+            # Initialize optional FAISS app retriever
+            if RAG_APP_CONFIG.get("enabled", False):
+                try:
+                    from app_faiss_retriever import AppFaissRetriever
+                    self.app_rag = AppFaissRetriever().load()
+                    logger.info("✅ App FAISS retriever initialized")
+                except Exception as e:
+                    logger.warning(f"App FAISS RAG initialization failed: {e}")
             
         except Exception as e:
             logger.error(f"❌ Failed to load models: {str(e)}")
@@ -205,6 +215,15 @@ class ModelService:
                     rag_candidates = self.rag.retrieve(query_text)
                 except Exception as e:
                     logger.warning(f"RAG retrieve failed: {e}")
+
+            # Optional App FAISS retrieval
+            app_candidates = []
+            if self.app_rag is not None and (request.summary or request.text):
+                try:
+                    query_text = ((request.summary or "") + " \n " + (request.text or "")).strip()
+                    app_candidates = self.app_rag.retrieve(query_text)
+                except Exception as e:
+                    logger.warning(f"App FAISS retrieve failed: {e}")
             
             processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
             
@@ -215,6 +234,7 @@ class ModelService:
                 "lower_level_confidence": predictions["lower_confidence"],
                 "top3_predictions": predictions["top3_predictions"],
                 "rag_candidates": rag_candidates,
+                "app_candidates": app_candidates,
                 "processing_time_ms": processing_time,
                 "timestamp": datetime.now()
             }
@@ -338,6 +358,6 @@ class ModelService:
         return self.lower_label_encoder.classes_.tolist()
     
     async def cleanup(self):
-        """Cleanup resources."""
+        """Cleanup resorces."""
         logger.info("🧹 Cleaning up model service...")
         self.is_loaded = False
