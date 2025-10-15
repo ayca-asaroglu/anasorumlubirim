@@ -39,6 +39,10 @@ class PredictionResponse(BaseModel):
     top3_predictions: List[str] = Field(..., description="Top 3 lower-level predictions")
     processing_time_ms: float = Field(..., description="Processing time in milliseconds")
     timestamp: datetime = Field(default_factory=datetime.now, description="Prediction timestamp")
+    rag_candidates: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Top-k application/unit candidates from RAG retriever"
+    )
 
 
 class BatchPredictionRequest(BaseModel):
