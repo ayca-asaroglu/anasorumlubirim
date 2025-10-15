@@ -49,6 +49,18 @@ API_CONFIG = {
     "max_batch_size": 100
 }
 
+# Retrieval-Augmented Generation (RAG) Configuration
+RAG_CONFIG = {
+    "enabled": False,                 # Optional, off by default
+    "excel_path": "app_catalog.xlsx", # Application catalog Excel
+    "sheet_name": 0,                  # Sheet index or name
+    "app_name_col": "UygulamaAdi",
+    "app_desc_col": "UygulamaAciklamasi",
+    "directorate_col": "Direktorluk",
+    "units_col": "Birimler",         # Delimited list or multiple columns
+    "top_k": 5                        # Top-k candidates to retrieve
+}
+
 # Turkish Stopwords
 TURKISH_STOPWORDS = [
     # Basic Turkish stopwords
