@@ -88,6 +88,13 @@ AZURE_OPENAI_CONFIG = {
     "api_key": ""
 }
 
+# Optional corporate proxy configuration (applied if set)
+PROXY_CONFIG = {
+    "http_proxy": "",   # e.g., http://user:pass@proxy.company:8080
+    "https_proxy": "",  # e.g., http://user:pass@proxy.company:8080
+    "no_proxy": ""      # e.g., localhost,127.0.0.1,.company.local
+}
+
 # Turkish Stopwords
 TURKISH_STOPWORDS = [
     # Basic Turkish stopwords

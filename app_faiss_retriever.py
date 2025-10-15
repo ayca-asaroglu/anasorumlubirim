@@ -6,7 +6,7 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer
 import faiss
 import os
-from config import RAG_APP_CONFIG, PREPROCESSING_CONFIG, AZURE_OPENAI_CONFIG
+from config import RAG_APP_CONFIG, PREPROCESSING_CONFIG, AZURE_OPENAI_CONFIG, PROXY_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +113,17 @@ class AppFaissRetriever:
             from openai import AzureOpenAI
         except Exception as exc:
             raise RuntimeError(f"openai package not installed or incompatible: {exc}")
+
+        # Apply proxy settings if configured
+        http_proxy = PROXY_CONFIG.get("http_proxy") or os.getenv("HTTP_PROXY")
+        https_proxy = PROXY_CONFIG.get("https_proxy") or os.getenv("HTTPS_PROXY")
+        no_proxy = PROXY_CONFIG.get("no_proxy") or os.getenv("NO_PROXY")
+        if http_proxy:
+            os.environ["HTTP_PROXY"] = http_proxy
+        if https_proxy:
+            os.environ["HTTPS_PROXY"] = https_proxy
+        if no_proxy:
+            os.environ["NO_PROXY"] = no_proxy
 
         endpoint = os.getenv(AZURE_OPENAI_CONFIG["endpoint_env"]) or AZURE_OPENAI_CONFIG.get("endpoint", "")
         api_key = os.getenv(AZURE_OPENAI_CONFIG["api_key_env"]) or AZURE_OPENAI_CONFIG.get("api_key", "")
